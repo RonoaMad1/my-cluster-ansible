@@ -4,18 +4,25 @@
   gather_facts: true
 
   tasks:
-    - name: Hostname
-      ansible.builtin.command: hostname
-      changed_when: false
-
-    - name: Uptime
-      ansible.builtin.command: uptime
-      changed_when: false
-
     - name: Disk usage
       ansible.builtin.command: df -h /
+      register: disk_usage
       changed_when: false
 
     - name: Memory usage
       ansible.builtin.command: free -h
+      register: memory_usage
       changed_when: false
+
+    - name: Uptime
+      ansible.builtin.command: uptime
+      register: uptime_info
+      changed_when: false
+
+    - name: Show health summary
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ inventory_hostname }}"
+          - "{{ uptime_info.stdout }}"
+          - "{{ disk_usage.stdout_lines }}"
+          - "{{ memory_usage.stdout_lines }}"
