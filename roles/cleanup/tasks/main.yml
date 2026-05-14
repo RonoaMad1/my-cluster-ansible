@@ -22,3 +22,14 @@
 - name: Nettoyage images containerd K3s
   ansible.builtin.command: k3s crictl rmi --prune
   changed_when: true
+
+- name: Vérifier présence BuildKit
+  ansible.builtin.stat:
+    path: /var/lib/buildkit
+  register: buildkit_dir
+
+- name: Nettoyage BuildKit si présent
+  ansible.builtin.command: buildctl prune --all --force
+  when: buildkit_dir.stat.exists
+  changed_when: true
+  failed_when: false
