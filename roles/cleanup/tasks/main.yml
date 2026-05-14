@@ -1,0 +1,24 @@
+---
+- name: Nettoyage cache apt
+  ansible.builtin.apt:
+    autoclean: true
+    autoremove: true
+
+- name: Vacuum journald 7 jours
+  ansible.builtin.command: journalctl --vacuum-time=7d
+  changed_when: true
+
+- name: Limiter journald à 500M
+  ansible.builtin.lineinfile:
+    path: /etc/systemd/journald.conf
+    regexp: '^#?SystemMaxUse='
+    line: 'SystemMaxUse=500M'
+
+- name: Restart journald
+  ansible.builtin.systemd:
+    name: systemd-journald
+    state: restarted
+
+- name: Nettoyage images containerd K3s
+  ansible.builtin.command: k3s crictl rmi --prune
+  changed_when: true
