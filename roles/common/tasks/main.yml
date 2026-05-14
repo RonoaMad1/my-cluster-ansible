@@ -1,3 +1,59 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# tasks file for roles/common
+- name: Installer packages admin
+  ansible.builtin.apt:
+    name:
+      - htop
+      - iotop
+      - ncdu
+      - curl
+      - wget
+      - vim
+      - net-tools
+      - iputils-ping
+      - dnsutils
+      - jq
+      - unzip
+      - lsof
+      - strace
+    state: present
+    update_cache: true
+
+- name: Désactiver swap
+  ansible.builtin.command: swapoff -a
+  changed_when: false
+
+- name: Désactiver swap dans fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '.*swap.*'
+    state: absent
+
+- name: Tuning sysctl Kubernetes
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: true
+    reload: true
+  loop:
+    - { key: 'vm.swappiness', value: '0' }
+    - { key: 'vm.dirty_ratio', value: '15' }
+    - { key: 'vm.dirty_background_ratio', value: '5' }
+    - { key: 'net.ipv4.tcp_keepalive_time', value: '300' }
+    - { key: 'net.core.somaxconn', value: '32768' }
+    - { key: 'net.ipv4.ip_forward', value: '1' }
+
+- name: Limiter taille logs journald
+  ansible.builtin.lineinfile:
+    path: /etc/systemd/journald.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - { regexp: '^#?SystemMaxUse=', line: 'SystemMaxUse=500M' }
+    - { regexp: '^#?SystemMaxFileSize=', line: 'SystemMaxFileSize=50M' }
+    - { regexp: '^#?MaxRetentionSec=', line: 'MaxRetentionSec=1month' }
+  notify: Restart journald
+
+- name: Set timezone UTC
+  community.general.timezone:
+    name: Europe/Paris
