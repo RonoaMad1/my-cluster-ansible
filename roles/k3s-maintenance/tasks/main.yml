@@ -1,3 +1,46 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# tasks file for roles/k3s-maintenance
+- name: Drain node
+  become: false
+  delegate_to: localhost
+  ansible.builtin.command: >
+    kubectl drain {{ inventory_hostname }}
+    --ignore-daemonsets
+    --delete-emptydir-data
+    --disable-eviction=true
+    --timeout=180s
+  environment:
+    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
+
+- name: Upgrade OS packages
+  ansible.builtin.apt:
+    upgrade: full
+    update_cache: true
+    autoremove: true
+
+- name: Check reboot required
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: reboot_required
+
+- name: Reboot if required
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+  when: reboot_required.stat.exists
+
+- name: Uncordon node
+  become: false
+  delegate_to: localhost
+  ansible.builtin.command: kubectl uncordon {{ inventory_hostname }}
+  environment:
+    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
+
+- name: Wait node Ready
+  become: false
+  delegate_to: localhost
+  ansible.builtin.command: >
+    kubectl wait node {{ inventory_hostname }}
+    --for=condition=Ready
+    --timeout=120s
+  environment:
+    KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
+  changed_when: false
