@@ -1,68 +1,74 @@
 ---
-- name: Mise à jour OS — Workers (worker01, master02)
+- name: Mise à jour OS — Workers
   hosts: k3s_agents
   serial: 1
   become: true
 
   tasks:
     - name: Drain le nœud
+      become: false
       delegate_to: localhost
-      command: >
+      ansible.builtin.command: >
         kubectl drain {{ inventory_hostname }}
         --ignore-daemonsets
         --delete-emptydir-data
-        --timeout=120s
+        --disable-eviction=true
+        --timeout=180s
       environment:
-        KUBECONFIG: ~/.kube/config
+        KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
 
     - name: Mise à jour des paquets
-      apt:
+      ansible.builtin.apt:
         upgrade: full
         update_cache: true
         autoremove: true
 
     - name: Vérifier si reboot nécessaire
-      stat:
+      ansible.builtin.stat:
         path: /var/run/reboot-required
       register: reboot_required
 
     - name: Reboot si nécessaire
-      reboot:
+      ansible.builtin.reboot:
         reboot_timeout: 300
       when: reboot_required.stat.exists
 
     - name: Uncordon le nœud
+      become: false
       delegate_to: localhost
-      command: kubectl uncordon {{ inventory_hostname }}
+      ansible.builtin.command: kubectl uncordon {{ inventory_hostname }}
       environment:
-        KUBECONFIG: ~/.kube/config
+        KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
 
     - name: Attendre Ready
+      become: false
       delegate_to: localhost
-      command: >
+      ansible.builtin.command: >
         kubectl wait node {{ inventory_hostname }}
-        --for=condition=Ready --timeout=120s
+        --for=condition=Ready
+        --timeout=120s
       environment:
-        KUBECONFIG: ~/.kube/config
+        KUBECONFIG: "{{ lookup('env', 'HOME') }}/.kube/config"
+      changed_when: false
 
-- name: Mise à jour OS — Control plane (master01 en dernier)
+- name: Mise à jour OS — Control plane
   hosts: k3s_servers
   serial: 1
   become: true
 
   tasks:
     - name: Mise à jour des paquets
-      apt:
+      ansible.builtin.apt:
         upgrade: full
         update_cache: true
         autoremove: true
 
     - name: Vérifier si reboot nécessaire
-      stat:
+      ansible.builtin.stat:
         path: /var/run/reboot-required
       register: reboot_required
 
     - name: Reboot si nécessaire
-      reboot:
+      ansible.builtin.reboot:
         reboot_timeout: 300
       when: reboot_required.stat.exists
