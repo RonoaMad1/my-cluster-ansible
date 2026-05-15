@@ -57,3 +57,23 @@
 - name: Set timezone UTC
   community.general.timezone:
     name: Europe/Paris
+
+- name: Configurer multipath blacklist pour Longhorn
+  ansible.builtin.copy:
+    dest: /etc/multipath.conf
+    content: |
+      defaults {
+          user_friendly_names yes
+      }
+      blacklist {
+          devnode "^sd[b-z]"
+      }
+    mode: '0644'
+  notify: Restart multipathd
+
+- name: Activer multipathd
+  ansible.builtin.systemd:
+    name: multipathd
+    enabled: true
+    state: started
+  failed_when: false

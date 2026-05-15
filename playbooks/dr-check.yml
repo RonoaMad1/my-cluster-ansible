@@ -1,0 +1,65 @@
+---
+- name: DR Check — État OS cluster
+  hosts: k3s_cluster
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Disk usage
+      command: df -h /
+      register: disk
+      changed_when: false
+
+    - name: K3s server status
+      command: systemctl is-active k3s
+      register: k3s_server
+      failed_when: false
+      changed_when: false
+
+    - name: K3s agent status
+      command: systemctl is-active k3s-agent
+      register: k3s_agent
+      failed_when: false
+      changed_when: false
+
+    - name: Fail2ban status
+      command: systemctl is-active fail2ban
+      register: fail2ban
+      failed_when: false
+      changed_when: false
+
+    - name: Rapport DR
+      debug:
+        msg:
+          - "=== {{ inventory_hostname }} ==="
+          - "{{ disk.stdout_lines[-1] }}"
+          - "k3s      : {{ k3s_server.stdout }}"
+          - "k3s-agent: {{ k3s_agent.stdout }}"
+          - "fail2ban : {{ fail2ban.stdout }}"
+
+- name: DR Check — État Kubernetes
+  hosts: k3s_servers
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Nodes status
+      command: kubectl get nodes
+      register: nodes
+      changed_when: false
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Pods en erreur
+      shell: kubectl get pods -A | grep -v Running | grep -v Completed | grep -v NAME
+      register: pods_error
+      changed_when: false
+      failed_when: false
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Rapport K8s
+      debug:
+        msg:
+          - "=== Nodes ==="
+          - "{{ nodes.stdout_lines }}"
+          - "=== Pods non Running ==="
+          - "{{ pods_error.stdout_lines if pods_error.stdout else ['Tous les pods sont Running ✅'] }}"

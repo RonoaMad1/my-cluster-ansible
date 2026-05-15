@@ -1,0 +1,33 @@
+---
+- name: Bootstrap nœud K3s — configuration OS de base
+  hosts: "{{ target | default('all') }}"
+  become: true
+  serial: 1
+  roles:
+    - common
+    - security
+    - cleanup
+
+- name: Vérification post-bootstrap
+  hosts: "{{ target | default('all') }}"
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Vérifier K3s server
+      command: systemctl is-active k3s
+      register: k3s_server
+      failed_when: false
+      changed_when: false
+
+    - name: Vérifier K3s agent
+      command: systemctl is-active k3s-agent
+      register: k3s_agent
+      failed_when: false
+      changed_when: false
+
+    - name: Résumé bootstrap
+      debug:
+        msg:
+          - "=== {{ inventory_hostname }} ==="
+          - "k3s       : {{ k3s_server.stdout }}"
+          - "k3s-agent : {{ k3s_agent.stdout }}"
